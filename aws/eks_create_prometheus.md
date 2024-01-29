@@ -87,7 +87,16 @@
     helm install prometheus ./ -f values.yaml --namespace monitor
 
 ## 升级
-helm upgrade prometheus ./ -f values.yaml --namespace monitor
+    helm upgrade prometheus ./ -f values.yaml --namespace monitor
 
 ## 删除
-helm uninstall  prometheus  --namespace monitor
+    helm uninstall  prometheus  --namespace monitor
+
+
+## 启动
+
+    export POD_NAME=$(kubectl get pods --namespace monitor -l "app.kubernetes.io/name=prometheus,app.kubernetes.io/instance=prometheus" -o jsonpath="{.items[0].metadata.name}")
+
+
+
+    kubectl --namespace monitor port-forward $POD_NAME 9090
