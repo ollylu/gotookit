@@ -60,32 +60,24 @@ metadata:
     3、配置对所有deployment的日志采集
 
 ```yaml
-  application-log.conf: |
+  deployment-log.conf: |
     [INPUT]
         Name                tail
-        Tag                 application.*
-        Path                /var/log/containers/fluent-bit*
+        Tag                 deployment.*
+        Exclude_Path        /var/log/containers/cloudwatch-agent*, /var/log/containers/fluent-bit*, /var/log/containers/aws-node*, /var/log/containers/kube-proxy*
+        Path                /var/log/containers/*.log
         multiline.parser    docker, cri
-        DB                  /var/fluent-bit/state/flb_log.db
-        Mem_Buf_Limit       5MB
+        DB                  /var/fluent-bit/state/deployment_container.db
+        Mem_Buf_Limit       50MB
         Skip_Long_Lines     On
         Refresh_Interval    10
-        Read_from_Head      ${READ_FROM_HEAD}
-
-    [INPUT]
-        Name                tail
-        Tag                 application.*
-        Path                /var/log/containers/cloudwatch-agent*
-        multiline.parser    docker, cri
-        DB                  /var/fluent-bit/state/flb_cwagent.db
-        Mem_Buf_Limit       5MB
-        Skip_Long_Lines     On
-        Refresh_Interval    10
+        Rotate_Wait         30
+        storage.type        filesystem
         Read_from_Head      ${READ_FROM_HEAD}
 
     [FILTER]
         Name                kubernetes
-        Match               application.*
+        Match               deployment.*
         Kube_URL            https://kubernetes.default.svc:443
         Kube_Tag_Prefix     application.var.log.containers.
         Merge_Log           On
@@ -98,14 +90,22 @@ metadata:
         Kubelet_Port        10250
         Buffer_Size         0
 
+    [FILTER]
+        Name                lua
+        Match               deployment.*
+        script              /fluent-bit/etc/lua/construct_log_group_name.lua
+        call                construct_log_group_name
+
     [OUTPUT]
-        Name                cloudwatch_logs
-        Match               application.*
-        region              ${AWS_REGION}
-        log_group_name      /aws/containerinsights/${CLUSTER_NAME}/application
-        log_stream_prefix   ${HOST_NAME}-
-        auto_create_group   true
-        extra_user_agent    container-insights
+        Name                  cloudwatch
+        Match                 deployment.*
+        region                ${AWS_REGION}
+        log_group_name        $(kubernetes['log_group_name'])
+        log_stream_name       $(kubernetes['pod_name']).$(kubernetes['container_name'])
+        log_stream_template   $(kubernetes['pod_name']).$(kubernetes['container_name'])
+        log_retention_days    1
+        auto_create_group     true
+        extra_user_agent      container-insights
 ```
 
 
